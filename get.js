@@ -7,7 +7,7 @@ export async function main(event, context) {
     TableName: "stats",
     KeyConditionExpression: "countryId = :countryId",
     ExpressionAttributeValues: {
-        ":countryId": event.countryId
+        ":countryId": event.pathParameters.countryId
     }
   };
 
