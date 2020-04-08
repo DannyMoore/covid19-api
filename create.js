@@ -37,6 +37,60 @@ async function writeChunk(data) {
   }
 }
 
+function getDBElement( dayTimestamp, lastUpdateTimestamp, element ) {
+  let ret = {
+    dayTimestamp: dayTimestamp,
+    lastUpdateTimestamp: lastUpdateTimestamp,
+    day: element.day,
+    time: element.time,
+    country: element.country,
+    active: !isNaN(Number(element.cases.active)) ? Number(element.cases.active) : 0,
+    critical: !isNaN(Number(element.cases.critical)) ? Number(element.cases.critical) : 0,
+    recovered: !isNaN(Number(element.cases.recovered)) ? Number(element.cases.recovered) : 0,
+    total: !isNaN(Number(element.cases.total)) ? Number(element.cases.total) : 0,
+    deaths: !isNaN(Number(element.deaths.total)) ? Number(element.deaths.total) : 0,
+    tests: !isNaN(Number(element.tests.total)) ? Number(element.tests.total) : 0,
+  }
+
+  return ret;
+}
+
+async function cleanData( data ) {
+  let dataForDB = [];
+
+  let map = new Map();
+
+
+  data.forEach(element => {
+    //let item = { ...element, countryId: element.country, timestamps: element.time, id: uuid.v1() };
+    let dayTimestamp = Date.parse(element.day);
+    let lastUpdateTimestamp = Date.parse(element.time);
+    let key = element.country + "_:_" + element.day;
+
+    let current = map.get(key);
+    let newone = getDBElement(dayTimestamp, lastUpdateTimestamp, element);
+    if ( current == undefined || newone.time > current.time) {
+      console.log( "setting item: " + key + " to " + newone.time);
+      map.set( key, newone)
+    } else {
+      console.log( "skipping item: " + key + newone.time);
+    }
+  });
+
+  map.forEach( item => {
+    console.log(item);
+    //console.log(new Date(item.dayTimestamp).toDateString());
+    //console.log(new Date(item.lastUpdateTimestamp).toTimeString());
+    dataForDB.push({
+      PutRequest: {
+        Item: item
+      }
+    });
+  });
+
+  return dataForDB;
+}
+
 export async function main(event, context, callback) {
 
   let data = await getDataFromApi();
@@ -45,18 +99,29 @@ export async function main(event, context, callback) {
     console.log("Empty reply from API");
     return;
   }
+  // let sample = [{
+  //   "country": "Israel",
+  //   "cases": {
+  //       "new": "+474",
+  //       "active": 8262,
+  //       "critical": 140,
+  //       "recovered": 585,
+  //       "total": 8904
+  //   },
+  //   "deaths": {
+  //       "new": "+8",
+  //       "total": 57
+  //   },
+  //   "tests": {
+  //       "total": 109724
+  //   },
+  //   "day": "2020-04-07",
+  //   "time": "2020-04-07T06:45:04+00:00"
+  // }];
 
-  let dataForDB = [];
-  console.log(data);
-  data.forEach(element => {
-    let item = { ...element, countryId: element.country, timestamps: element.time, id: uuid.v1() };
-    console.log(item);
-    dataForDB.push({
-      PutRequest: {
-        Item: item
-      }
-    });
-  });
+  // let data = sample;
+  let dataForDB = await cleanData( data );
+  console.log( "Got " + dataForDB.length + " items to update DB");
 
   // DynamoDB only accepts 25 items at a time.
   for (let i = 0; i < dataForDB.length; i += 25) {
@@ -79,4 +144,5 @@ export async function main(event, context, callback) {
   console.log(
     "If no errors are shown, DynamoDB operation has been successful"
   );
+
 }

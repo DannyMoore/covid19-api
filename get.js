@@ -2,13 +2,14 @@ import * as dynamoDbLib from "./libs/dynamodb-lib";
 import { success, failure } from "./libs/response-lib";
 
 export async function main(event, context) {
-
+  console.log("event: " + event)
   const params = {
-    TableName: "stats",
-    KeyConditionExpression: "countryId = :countryId",
+    TableName: "history",
+    KeyConditionExpression: "country = :country",
     ExpressionAttributeValues: {
-        ":countryId": event.pathParameters.countryId
-    }
+        ":country": event.pathParameters.countryId
+    },
+    ScanIndexForward: true
   };
 
   try {
